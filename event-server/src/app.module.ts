@@ -1,0 +1,30 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
+import { EventsModule } from './events/events.module';
+import { RewardsModule } from './rewards/rewards.module';
+import { RewardRequestsModule } from './reward-requests/reward-requests.module';
+import { AuthModule } from './auth/auth.module';
+import { UserActivityModule } from './user-activity/user-activity.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+    }),
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        uri: configService.get<string>('DATABASE_URL'),
+      }),
+      inject: [ConfigService],
+    }),
+    AuthModule,
+    EventsModule,
+    RewardsModule,
+    RewardRequestsModule,
+    UserActivityModule,
+  ],
+})
+export class AppModule {}
