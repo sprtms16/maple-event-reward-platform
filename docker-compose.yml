@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: event-reward-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - event-reward-network
+
+  auth-server:
+    build:
+      context: ./auth-server # auth-server 디렉토리 경로
+      dockerfile: Dockerfile
+    container_name: auth-server
+    ports:
+      - "3001:3000" # 외부 포트 3001, 내부 포트 3000 (NestJS 기본 포트)
+    depends_on:
+      - mongodb
+    environment:
+      - DATABASE_URL=mongodb://mongodb:27017/auth_db # MongoDB 연결 URL
+      - JWT_SECRET=19e1d931a64fc86c7d77a2de457cff91af7c79cba60d413296715e97f4bf277cb1b9a13aca6eebb3f436cd6f81cf8b4846dbd2441bde2afed2a92461d17e8001
+      - PORT=3000
+    volumes:
+      - ./auth-server/src:/usr/src/app/src
+    networks:
+      - event-reward-network
+
+  event-server:
+    build:
+      context: ./event-server # event-server 디렉토리 경로
+      dockerfile: Dockerfile
+    container_name: event-server
+    ports:
+      - "3002:3000"
+    depends_on:
+      - mongodb
+    environment:
+      - DATABASE_URL=mongodb://mongodb:27017/event_db
+      - JWT_SECRET=19e1d931a64fc86c7d77a2de457cff91af7c79cba60d413296715e97f4bf277cb1b9a13aca6eebb3f436cd6f81cf8b4846dbd2441bde2afed2a92461d17e8001
+      - PORT=3000
+    volumes:
+      - ./event-server/src:/usr/src/app/src
+    networks:
+      - event-reward-network
+
+  gateway-server:
+    build:
+      context: ./gateway-server # gateway-server 디렉토리 경로
+      dockerfile: Dockerfile
+    container_name: gateway-server
+    ports:
+      - "3000:3000" # 외부에서 접근하는 메인 포트
+    depends_on:
+      - auth-server
+      - event-server
+    environment:
+      - PORT=3000
+      - JWT_SECRET=19e1d931a64fc86c7d77a2de457cff91af7c79cba60d413296715e97f4bf277cb1b9a13aca6eebb3f436cd6f81cf8b4846dbd2441bde2afed2a92461d17e8001
+      - AUTH_SERVICE_URL=http://auth-server:3000 # 내부 통신용 Auth 서버 주소
+      - EVENT_SERVICE_URL=http://event-server:3000 # 내부 통신용 Event 서버 주소
+    volumes:
+      - ./gateway-server/src:/usr/src/app/src
+    networks:
+      - event-reward-network
+
+volumes:
+  mongo_data:
+
+networks:
+  event-reward-network:
+    driver: bridge
