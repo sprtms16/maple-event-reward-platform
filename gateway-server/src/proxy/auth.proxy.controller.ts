@@ -30,8 +30,7 @@ export class AuthProxyController {
   @All('*')
   async proxyToAuthService(@Req() req: Request, @Res() res: Response) {
     const { method, originalUrl, body, headers: clientHeaders } = req;
-    const targetPath = originalUrl.replace(/^\/auth/, '');
-    const targetUrl = `${this.authServiceUrl}${targetPath}`;
+    const targetUrl = `${this.authServiceUrl}${originalUrl}`;
 
     this.logger.log(
       `Proxying ${method} request from ${originalUrl} to Auth Service: ${targetUrl}`,

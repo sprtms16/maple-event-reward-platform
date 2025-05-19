@@ -1,5 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, SchemaTypes, Types } from 'mongoose';
+import {
+  SchemaTypes,
+  Types,
+  PopulatedDoc,
+  HydratedDocument,
+  Schema as MongooseSchema,
+} from 'mongoose';
+import { EventDocument } from '../../events/schemas/event.schema';
+import { RewardDocument } from '../../rewards/schemas/reward.schema';
 
 export enum RewardRequestStatus {
   PENDING = 'PENDING',
@@ -10,11 +18,8 @@ export enum RewardRequestStatus {
   CANCELLED = 'CANCELLED',
 }
 
-export type RewardRequestDocument = RewardRequest & Document<Types.ObjectId>;
-
 @Schema({ timestamps: true, collection: 'reward_requests' })
 export class RewardRequest {
-
   @Prop({ type: SchemaTypes.ObjectId, required: true, index: true })
   userId: Types.ObjectId;
 
@@ -24,7 +29,7 @@ export class RewardRequest {
     required: true,
     index: true,
   })
-  eventId: Types.ObjectId;
+  eventId: PopulatedDoc<EventDocument | Types.ObjectId>;
 
   @Prop({
     type: SchemaTypes.ObjectId,
@@ -32,7 +37,7 @@ export class RewardRequest {
     required: true,
     index: true,
   })
-  rewardId: Types.ObjectId;
+  rewardId: PopulatedDoc<RewardDocument | Types.ObjectId>;
 
   @Prop({
     type: String,
@@ -58,4 +63,6 @@ export class RewardRequest {
   transactionDetails?: Record<string, any>;
 }
 
-export const RewardRequestSchema = SchemaFactory.createForClass(RewardRequest);
+export type RewardRequestDocument = HydratedDocument<RewardRequest>;
+export const RewardRequestSchema: MongooseSchema<RewardRequest> =
+  SchemaFactory.createForClass(RewardRequest);
