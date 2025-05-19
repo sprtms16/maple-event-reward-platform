@@ -289,16 +289,19 @@ export class RewardRequestsService {
       throw new BadRequestException('유효하지 않은 요청 ID 형식입니다.');
     const request = await this.rewardRequestModel
       .findById(requestId)
-      .populate('eventId')
-      .populate('rewardId')
-      .populate('userId', 'username')
+      .populate<{ eventId: EventDocument | null }>('eventId')
+      .populate<{ rewardId: RewardDocument | null }>('rewardId')
+      .populate<{
+        userId: { _id: Types.ObjectId; username: string } | null;
+      }>('userId', 'username')
       .exec();
+
     if (!request) {
       throw new NotFoundException(
         `ID가 "${requestId}"인 보상 요청을 찾을 수 없습니다.`,
       );
     }
-    return request;
+    return request as unknown as RewardRequestDocument;
   }
 
   async updateRequestStatus(
@@ -332,7 +335,25 @@ export class RewardRequestsService {
     }
 
     if (dto.status === RewardRequestStatus.COMPLETED) {
-      const reward = await this.rewardModel.findById(request.rewardId).exec();
+      let rewardToUpdateId: Types.ObjectId;
+      if (request.rewardId instanceof Types.ObjectId) {
+        rewardToUpdateId = request.rewardId;
+      } else if (
+        request.rewardId &&
+        typeof request.rewardId === 'object' &&
+        '_id' in request.rewardId
+      ) {
+        rewardToUpdateId = (request.rewardId as RewardDocument)._id;
+      } else {
+        this.logger.error(
+          `Cannot extract ObjectId from request.rewardId: ${JSON.stringify(request.rewardId)}`,
+        );
+        throw new InternalServerErrorException(
+          '보상 ID를 확인할 수 없어 지급에 실패했습니다.',
+        );
+      }
+
+      const reward = await this.rewardModel.findById(rewardToUpdateId).exec();
       if (!reward)
         throw new InternalServerErrorException(
           '보상 정보를 찾을 수 없어 지급에 실패했습니다.',
@@ -361,10 +382,28 @@ export class RewardRequestsService {
           );
         }
       }
-      const userIdStr = request.userId.toHexString();
-      const rewardIdStr = request.rewardId.toHexString();
+
+      let userIdForLog: string;
+      if (request.userId instanceof Types.ObjectId) {
+        userIdForLog = request.userId.toHexString();
+      } else if (
+        request.userId &&
+        typeof request.userId === 'object' &&
+        '_id' in request.userId
+      ) {
+        userIdForLog = (
+          request.userId as { _id: Types.ObjectId }
+        )._id.toHexString();
+      } else {
+        userIdForLog = 'unknown_user_id_type_issue';
+        this.logger.error(
+          `Cannot extract ObjectId from request.userId: ${JSON.stringify(request.userId)}`,
+        );
+      }
+
+      const rewardIdForLog = rewardToUpdateId.toHexString();
       this.logger.log(
-        `보상 지급 처리: 사용자 ID ${userIdStr}, 보상 ID ${rewardIdStr}`,
+        `보상 지급 처리: 사용자 ID ${userIdForLog}, 보상 ID ${rewardIdForLog}`,
       );
       request.transactionDetails = {
         message: '보상 지급 완료됨 (시뮬레이션)',
